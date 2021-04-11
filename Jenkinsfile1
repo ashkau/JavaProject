@@ -1,0 +1,62 @@
+pipeline {
+         agent any
+         stages {
+                 stage('Git Repository') {
+                 steps {
+                     echo 'Getting git repository'
+                     git credentialsId: '2d6267e7-f0d5-41dc-b120-c1ff2a9435fe', url: 'https://github.com/ashkau/VSProjects.git'
+                 }
+                 }
+                 stage('Build') {
+                 steps {
+                     bat 'echo \'Getting nuget package restore'
+                     bat '"C:\\Nuget\\nuget.exe" restore "C:\\Users\\ashkau\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\VSConsoleApp\\ConsoleApp\\ConsoleApp.sln"'
+                     bat 'echo \'Building application'
+                     bat '"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe" "C:\\Users\\ashkau\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\VSConsoleApp\\ConsoleApp\\ConsoleApp.sln" -property:Configuration=Debug'
+                 }
+                 }
+                 stage('Unit Test') {
+                 steps {
+                       bat 'echo \'Running all unit tests using VSTest.Console.Exe'
+                       bat '"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow\\vstest.console.exe" "C:\\Users\\ashkau\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\VSConsoleApp\\ConsoleApp\\UnitTestProject\\bin\\Debug\\netcoreapp2.1\\UnitTestProject.dll" /Logger:trx'
+                 }
+                 }
+                 stage('Report Generation') {
+                 steps {
+                       bat 'echo \'Running batch commands for opencover tool'
+                       bat '"C:\\Tool\\OpenCover\\OpenCover.Console.exe" -returntargetcode -register:user -target:"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow\\vstest.console.exe" -targetargs:"C:\\Users\\ashkau\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\VSConsoleApp\\ConsoleApp\\UnitTestProject\\bin\\Debug\\netcoreapp2.1\\UnitTestProject.dll" -output:Coverage.xml -oldStyle'
+                       bat 'echo \'Running batch commands for Report gererator tool'
+                       bat '"C:\\Tool\\RepGen\\ReportGenerator.exe" -reports:"Coverage.xml" -targetdir:"C:\\Tool\\TestResult"'
+                       bat 'echo \'Running batch commands for Cobertura tool'
+                       bat 'C:\\Tool\\Cobertura\\OpenCoverToCoberturaConverter.exe -input:"C:\\Users\\ashkau\\AppData\\Local\\Jenkins\\.jenkins\\workspace\\VSConsoleApp\\Coverage.xml" -output:"Cobertura.xml"'
+                 }
+                 }
+                 stage('Report Publish') {
+                 steps {
+                       bat 'echo \'Publishing Test Coverage Report'
+                       publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'C:\\Tool\\TestResult', reportFiles: 'index.html', reportName: 'HTML Test Coverage Report', reportTitles: ''])
+                       bat 'echo \'Publishing MSTest Test Result'
+                       mstest()
+                       bat 'echo \'Publishing Cobertura Coverage Report'
+                       cobertura autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: '**/Cobertura.xml', conditionalCoverageTargets: '70, 0, 0', failUnhealthy: false, failUnstable: false, lineCoverageTargets: '80, 0, 0', maxNumberOfBuilds: 0, methodCoverageTargets: '80, 0, 0', onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false
+                 }
+                 }
+}
+post{
+    always{
+        echo "post run - will Always run"
+    }
+    success{
+        echo "post run - will run when success"
+    }
+    failure{
+        echo "post run - will run when failure"
+    }
+    unstable{
+        echo "post run - will run when unstable"
+    }
+    changed{
+        echo "post run - will run when there is any change from previous build run"
+    }
+}
+}
